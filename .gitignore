@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment variables
+.env
+
+# Data files - do not version raw or generated data
+data/source/*
+data/bronze/*
+data/silver/*
+data/gold/*
+
+# Keep data folder structure
+!data/source/.gitkeep
+!data/bronze/.gitkeep
+!data/silver/.gitkeep
+!data/gold/.gitkeep
+
+# Models
+models/*
+!models/.gitkeep
+
+# Generated reports
+reports/*
+!reports/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db
