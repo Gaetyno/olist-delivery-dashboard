@@ -1,6 +1,6 @@
 # Olist Data Project
 
-Projet data engineering, analytics et machine learning basé sur le dataset Olist Brazilian E-Commerce.
+Projet data engineering, analytics et machine learning (vite fait) basé sur le dataset Olist Brazilian E-Commerce.
 
 ## Objectif
 
