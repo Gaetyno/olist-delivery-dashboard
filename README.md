@@ -1,38 +1,26 @@
 # Olist Data Project
 
-Projet data engineering, analytics et machine learning (vite fait) basé sur le dataset Olist Brazilian E-Commerce.
+Projet Data Engineering, Data Analytics et Machine Learning basé sur le dataset Olist Brazilian E-Commerce.
 
-## Objectif
+## Objectif du projet
 
-Construire un pipeline complet de traitement de données :
+L’objectif est de construire un pipeline complet permettant d’analyser la performance logistique d’une marketplace e-commerce et de prédire les commandes à risque de retard de livraison.
 
-- compréhension des données ;
-- ingestion Bronze ;
-- nettoyage Silver ;
-- modélisation Gold ;
-- machine learning ;
-- dashboard final.
+Problématique métier :
 
-## Structure du projet
+> Comment identifier les commandes à risque de retard de livraison afin de réduire l’insatisfaction client et prioriser les actions opérationnelles ?
 
-```text
-data/
-  source/   Données CSV brutes non versionnées
-  bronze/   Données brutes ingérées
-  silver/   Données nettoyées
-  gold/     Données analytiques
+## Architecture du projet
 
-notebooks/
-  Notebooks d'exploration et d'analyse
+Le projet suit une logique en couches :
 
-src/
-  Scripts Python modulaires
 
-docs/
-  Documentation métier et technique
-
-reports/
-  Rapports générés
-
-models/
-  Modèles ML sauvegardés
+data/source/
+    ↓
+Bronze — ingestion des CSV bruts
+    ↓
+Silver — nettoyage et typage des données
+    ↓
+Gold — tables analytiques pour KPIs, dashboard et ML
+    ↓
+ML — entraînement du modèle de prédiction du retard
