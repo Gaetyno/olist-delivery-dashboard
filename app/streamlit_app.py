@@ -69,6 +69,26 @@ def format_float(value: float, suffix: str = "") -> str:
     return f"{value:.2f}{suffix}"
 
 
+def format_alert_table(df: pd.DataFrame) -> pd.DataFrame:
+    formatted = df.copy()
+
+    if "orders_count" in formatted.columns:
+        formatted["orders_count"] = formatted["orders_count"].round(0).astype(int)
+
+    if "late_rate" in formatted.columns:
+        formatted["late_rate"] = formatted["late_rate"].round(2).astype(str) + " %"
+
+    if "negative_review_rate" in formatted.columns:
+        formatted["negative_review_rate"] = (
+            formatted["negative_review_rate"].round(2).astype(str) + " %"
+        )
+
+    if "priority_score" in formatted.columns:
+        formatted["priority_score"] = formatted["priority_score"].round(2)
+
+    return formatted
+
+
 def build_dimension_analysis(df: pd.DataFrame, analysis_type: str) -> pd.DataFrame:
     delivered = df[df["order_status"] == "delivered"].copy()
 
@@ -124,11 +144,10 @@ orders = load_orders(str(gold_batch_dir))
 
 
 # -------------------------------------------------------------------
-# SIDEBAR
+# SIDEBAR — GLOBAL FILTERS ONLY
 # -------------------------------------------------------------------
 
-st.sidebar.title("Filtres")
-
+st.sidebar.title("Filtres globaux")
 st.sidebar.caption(f"Données utilisées : `{gold_batch_dir.name}`")
 
 min_date = orders["order_purchase_timestamp"].min().date()
@@ -161,42 +180,6 @@ selected_categories = st.sidebar.multiselect(
     default=[],
 )
 
-analysis_type = st.sidebar.radio(
-    "Analyse détaillée",
-    ["État client", "Catégorie produit", "Vendeur"],
-)
-
-sort_options = {
-    "Taux de retard": "late_rate",
-    "Nombre de commandes": "orders_count",
-    "Taux d'avis négatifs": "negative_review_rate",
-    "Note moyenne": "avg_review_score",
-    "Score de priorité": "priority_score",
-}
-
-sort_label = st.sidebar.selectbox(
-    "Trier par",
-    list(sort_options.keys()),
-)
-
-sort_col = sort_options[sort_label]
-
-top_n = st.sidebar.slider(
-    "Top N à afficher",
-    min_value=5,
-    max_value=30,
-    value=15,
-    step=5,
-)
-
-min_orders = st.sidebar.slider(
-    "Minimum de commandes",
-    min_value=1,
-    max_value=500,
-    value=50,
-    step=10,
-)
-
 
 # -------------------------------------------------------------------
 # FILTER DATA
@@ -217,6 +200,10 @@ if selected_categories:
         filtered_orders["main_product_category"].isin(selected_categories)
     ]
 
+if filtered_orders.empty:
+    st.error("Aucune donnée ne correspond aux filtres sélectionnés.")
+    st.stop()
+
 delivered_orders = filtered_orders[
     filtered_orders["order_status"] == "delivered"
 ].copy()
@@ -235,22 +222,13 @@ st.markdown(
     """
 )
 
-if filtered_orders.empty:
-    st.error("Aucune donnée ne correspond aux filtres sélectionnés.")
-    st.stop()
 
-
-# -------------------------------------------------------------------
-# TABS
-# -------------------------------------------------------------------
-
-tab_exec, tab_impact, tab_analysis, tab_alerts, tab_data = st.tabs(
+tab_exec, tab_impact, tab_analysis, tab_alerts = st.tabs(
     [
         "Vue exécutive",
         "Impact satisfaction",
         "Analyse détaillée",
         "Alertes opérationnelles",
-        "Données",
     ]
 )
 
@@ -303,6 +281,11 @@ with tab_exec:
         title="Nombre de commandes par mois",
     )
 
+    fig_monthly.update_layout(
+        xaxis_title="Mois",
+        yaxis_title="Nombre de commandes",
+    )
+
     st.plotly_chart(fig_monthly, use_container_width=True)
 
 
@@ -351,20 +334,34 @@ with tab_impact:
         text_auto=".2f",
     )
 
+    fig_review.update_layout(
+        xaxis_title="Statut de livraison",
+        yaxis_title="Note moyenne",
+    )
+
+    fig_negative.update_layout(
+        xaxis_title="Statut de livraison",
+        yaxis_title="Avis négatifs (%)",
+    )
+
     col1.plotly_chart(fig_review, use_container_width=True)
     col2.plotly_chart(fig_negative, use_container_width=True)
 
-    st.dataframe(
-        impact[
-            [
-                "delivery_status",
-                "orders_count",
-                "avg_review_score",
-                "negative_review_rate",
-            ]
-        ],
-        use_container_width=True,
+    impact_display = impact[
+        [
+            "delivery_status",
+            "orders_count",
+            "avg_review_score",
+            "negative_review_rate",
+        ]
+    ].copy()
+
+    impact_display["avg_review_score"] = impact_display["avg_review_score"].round(2)
+    impact_display["negative_review_rate"] = (
+        impact_display["negative_review_rate"].round(2).astype(str) + " %"
     )
+
+    st.dataframe(impact_display, use_container_width=True, hide_index=True)
 
 
 # -------------------------------------------------------------------
@@ -372,14 +369,56 @@ with tab_impact:
 # -------------------------------------------------------------------
 
 with tab_analysis:
-    st.header(f"Analyse détaillée — {analysis_type}")
+    st.header("Analyse détaillée")
+
+    col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
+
+    with col_filter1:
+        analysis_type = st.radio(
+            "Analyser par",
+            ["État client", "Catégorie produit", "Vendeur"],
+        )
+
+    sort_options = {
+        "Taux de retard": "late_rate",
+        "Nombre de commandes": "orders_count",
+        "Taux d'avis négatifs": "negative_review_rate",
+        "Note moyenne": "avg_review_score",
+        "Score de priorité": "priority_score",
+    }
+
+    with col_filter2:
+        sort_label = st.selectbox(
+            "Trier par",
+            list(sort_options.keys()),
+        )
+
+    with col_filter3:
+        results_count = st.slider(
+            "Nombre de résultats à afficher",
+            min_value=5,
+            max_value=30,
+            value=15,
+            step=5,
+        )
+
+    with col_filter4:
+        min_orders_analysis = st.slider(
+            "Ignorer les segments avec moins de X commandes",
+            min_value=1,
+            max_value=500,
+            value=50,
+            step=10,
+        )
+
+    sort_col = sort_options[sort_label]
 
     analysis = build_dimension_analysis(filtered_orders, analysis_type)
 
     analysis_filtered = (
-        analysis[analysis["orders_count"] >= min_orders]
+        analysis[analysis["orders_count"] >= min_orders_analysis]
         .sort_values(sort_col, ascending=False)
-        .head(top_n)
+        .head(results_count)
         .copy()
     )
 
@@ -391,7 +430,7 @@ with tab_analysis:
             x=sort_col,
             y="label",
             orientation="h",
-            title=f"Top {top_n} — {analysis_type} par {sort_label}",
+            title=f"{analysis_type} — classement par {sort_label}",
             hover_data=[
                 "orders_count",
                 "late_rate",
@@ -402,22 +441,41 @@ with tab_analysis:
             ],
         )
 
+        fig_analysis.update_layout(
+            xaxis_title=sort_label,
+            yaxis_title=analysis_type,
+        )
+
         st.plotly_chart(fig_analysis, use_container_width=True)
 
+        analysis_display = analysis_filtered[
+            [
+                "label",
+                "orders_count",
+                "late_rate",
+                "avg_delivery_days",
+                "avg_delay_days",
+                "avg_review_score",
+                "negative_review_rate",
+                "priority_score",
+            ]
+        ].copy()
+
+        analysis_display["late_rate"] = (
+            analysis_display["late_rate"].round(2).astype(str) + " %"
+        )
+        analysis_display["negative_review_rate"] = (
+            analysis_display["negative_review_rate"].round(2).astype(str) + " %"
+        )
+        analysis_display["avg_delivery_days"] = analysis_display["avg_delivery_days"].round(2)
+        analysis_display["avg_delay_days"] = analysis_display["avg_delay_days"].round(2)
+        analysis_display["avg_review_score"] = analysis_display["avg_review_score"].round(2)
+        analysis_display["priority_score"] = analysis_display["priority_score"].round(2)
+
         st.dataframe(
-            analysis_filtered[
-                [
-                    "label",
-                    "orders_count",
-                    "late_rate",
-                    "avg_delivery_days",
-                    "avg_delay_days",
-                    "avg_review_score",
-                    "negative_review_rate",
-                    "priority_score",
-                ]
-            ],
+            analysis_display,
             use_container_width=True,
+            hide_index=True,
         )
 
 
@@ -430,103 +488,91 @@ with tab_alerts:
 
     st.markdown(
         """
-        Le score de priorité combine le volume de commandes, le taux de retard
-        et le taux d'avis négatifs. Il permet d'éviter de prioriser uniquement
-        des segments avec très peu de commandes.
+        Les segments ci-dessous sont priorisés selon leur volume de commandes, leur taux de retard
+        et leur taux d'avis négatifs. Cela évite de mettre en avant des segments avec très peu de commandes.
         """
+    )
+
+    min_orders_alerts = st.slider(
+        "Ignorer les segments avec moins de X commandes",
+        min_value=1,
+        max_value=1000,
+        value=100,
+        step=25,
+        key="min_orders_alerts",
     )
 
     state_analysis = build_dimension_analysis(filtered_orders, "État client")
     category_analysis = build_dimension_analysis(filtered_orders, "Catégorie produit")
     seller_analysis = build_dimension_analysis(filtered_orders, "Vendeur")
 
+    state_alerts = (
+        state_analysis[state_analysis["orders_count"] >= min_orders_alerts]
+        .sort_values("priority_score", ascending=False)
+        .head(5)[
+            [
+                "label",
+                "orders_count",
+                "late_rate",
+                "negative_review_rate",
+                "priority_score",
+            ]
+        ]
+    )
+
+    category_alerts = (
+        category_analysis[category_analysis["orders_count"] >= min_orders_alerts]
+        .sort_values("priority_score", ascending=False)
+        .head(5)[
+            [
+                "label",
+                "orders_count",
+                "late_rate",
+                "negative_review_rate",
+                "priority_score",
+            ]
+        ]
+    )
+
+    seller_alerts = (
+        seller_analysis[seller_analysis["orders_count"] >= min_orders_alerts]
+        .sort_values("priority_score", ascending=False)
+        .head(5)[
+            [
+                "label",
+                "orders_count",
+                "late_rate",
+                "negative_review_rate",
+                "priority_score",
+            ]
+        ]
+    )
+
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.subheader("États à surveiller")
         st.dataframe(
-            state_analysis[state_analysis["orders_count"] >= min_orders]
-            .sort_values("priority_score", ascending=False)
-            .head(5)[
-                [
-                    "label",
-                    "orders_count",
-                    "late_rate",
-                    "negative_review_rate",
-                    "priority_score",
-                ]
-            ],
+            format_alert_table(state_alerts),
             use_container_width=True,
+            hide_index=True,
         )
 
     with col2:
         st.subheader("Catégories à surveiller")
         st.dataframe(
-            category_analysis[category_analysis["orders_count"] >= min_orders]
-            .sort_values("priority_score", ascending=False)
-            .head(5)[
-                [
-                    "label",
-                    "orders_count",
-                    "late_rate",
-                    "negative_review_rate",
-                    "priority_score",
-                ]
-            ],
+            format_alert_table(category_alerts),
             use_container_width=True,
+            hide_index=True,
         )
 
     with col3:
         st.subheader("Vendeurs à surveiller")
         st.dataframe(
-            seller_analysis[seller_analysis["orders_count"] >= min_orders]
-            .sort_values("priority_score", ascending=False)
-            .head(5)[
-                [
-                    "label",
-                    "orders_count",
-                    "late_rate",
-                    "negative_review_rate",
-                    "priority_score",
-                ]
-            ],
+            format_alert_table(seller_alerts),
             use_container_width=True,
+            hide_index=True,
         )
 
-
-# -------------------------------------------------------------------
-# TAB 5 — DATA
-# -------------------------------------------------------------------
-
-with tab_data:
-    st.header("Données filtrées")
-
-    st.write(f"Nombre de lignes après filtres : {len(filtered_orders):,}")
-
-    columns_to_display = [
-        "order_id",
-        "order_status",
-        "customer_state",
-        "main_product_category",
-        "main_seller_id",
-        "late_delivery",
-        "delivery_days",
-        "delay_days",
-        "review_score",
-        "negative_review",
-        "total_price",
-        "total_freight",
-        "payment_type",
-    ]
-
-    available_columns = [
-        col for col in columns_to_display
-        if col in filtered_orders.columns
-    ]
-
-    st.dataframe(
-        filtered_orders[available_columns].head(500),
-        use_container_width=True,
-    )
 
 st.success("Dashboard interactif chargé avec succès.")
