@@ -53,3 +53,12 @@ data/gold/
 ```
 
 Le dashboard Streamlit inclut également un onglet de prédiction ML permettant de simuler le risque de retard d'une commande à partir des variables utilisées par le modèle.
+
+## PostgreSQL
+
+Le projet utilise PostgreSQL via Docker pour stocker les tables Gold générées par le pipeline.
+
+### Lancer PostgreSQL
+
+```bash
+docker compose up -d
