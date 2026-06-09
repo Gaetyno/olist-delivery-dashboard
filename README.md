@@ -24,3 +24,30 @@ Silver — nettoyage et typage des données
 Gold — tables analytiques pour KPIs, dashboard et ML
     ↓
 ML — entraînement du modèle de prédiction du retard
+
+
+## Lancer le dashboard Streamlit
+
+Le projet contient un dashboard interactif Streamlit permettant d’explorer :
+
+- les KPIs globaux de livraison ;
+- l’impact des retards sur la satisfaction client ;
+- les analyses par État client, catégorie produit et vendeur ;
+- les alertes opérationnelles.
+
+Avant de lancer le dashboard, exécuter le pipeline complet :
+
+```bash
+python run_pipeline.py
+
+Ensuite, lancer l’application Streamlit :
+
+```bash
+python -m streamlit run app/streamlit_app.py
+```
+
+Le dashboard utilise automatiquement le dernier dossier Gold disponible dans :
+
+```text
+data/gold/
+```
