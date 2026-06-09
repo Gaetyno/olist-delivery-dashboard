@@ -378,7 +378,7 @@ with tab_exec:
         yaxis_title="Nombre de commandes",
     )
 
-    st.plotly_chart(fig_monthly, use_container_width=True)
+    st.plotly_chart(fig_monthly, width="stretch")
 
 
 # -------------------------------------------------------------------
@@ -436,8 +436,8 @@ with tab_impact:
         yaxis_title="Avis négatifs (%)",
     )
 
-    col1.plotly_chart(fig_review, use_container_width=True)
-    col2.plotly_chart(fig_negative, use_container_width=True)
+    col1.plotly_chart(fig_review, width="stretch")
+    col2.plotly_chart(fig_negative, width="stretch")
 
     impact_display = impact[
         [
@@ -453,7 +453,7 @@ with tab_impact:
         impact_display["negative_review_rate"].round(2).astype(str) + " %"
     )
 
-    st.dataframe(impact_display, use_container_width=True, hide_index=True)
+    st.dataframe(impact_display, width="stretch", hide_index=True)
 
 
 # -------------------------------------------------------------------
@@ -538,7 +538,7 @@ with tab_analysis:
             yaxis_title=analysis_type,
         )
 
-        st.plotly_chart(fig_analysis, use_container_width=True)
+        st.plotly_chart(fig_analysis, width="stretch")
 
         analysis_display = analysis_filtered[
             [
@@ -566,7 +566,7 @@ with tab_analysis:
 
         st.dataframe(
             analysis_display,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -646,7 +646,7 @@ with tab_alerts:
         st.subheader("États à surveiller")
         st.dataframe(
             format_alert_table(state_alerts),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -654,7 +654,7 @@ with tab_alerts:
         st.subheader("Catégories à surveiller")
         st.dataframe(
             format_alert_table(category_alerts),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -662,7 +662,7 @@ with tab_alerts:
         st.subheader("Vendeurs à surveiller")
         st.dataframe(
             format_alert_table(seller_alerts),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
