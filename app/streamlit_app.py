@@ -4,7 +4,10 @@ import joblib
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-
+import os
+from urllib.parse import quote_plus
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 GOLD_DIR = PROJECT_ROOT / "data" / "gold"
@@ -31,10 +34,12 @@ def get_latest_gold_batch() -> Path:
     return max(gold_batches, key=lambda path: path.name)
 
 
-@st.cache_data
-def load_orders(gold_batch_dir_str: str) -> pd.DataFrame:
-    gold_batch_dir = Path(gold_batch_dir_str)
-    orders = pd.read_csv(gold_batch_dir / "orders_enriched.csv")
+def normalize_orders(orders: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalise les colonnes nécessaires au dashboard.
+    Fonction utilisée aussi bien pour PostgreSQL que pour les CSV Gold.
+    """
+    orders = orders.copy()
 
     orders["order_purchase_timestamp"] = pd.to_datetime(
         orders["order_purchase_timestamp"],
@@ -51,6 +56,71 @@ def load_orders(gold_batch_dir_str: str) -> pd.DataFrame:
             )
 
     return orders
+
+
+def get_database_url() -> str:
+    """
+    Construit l'URL de connexion PostgreSQL depuis le fichier .env.
+    """
+    load_dotenv(PROJECT_ROOT / ".env")
+
+    user = os.getenv("POSTGRES_USER")
+    password = os.getenv("POSTGRES_PASSWORD")
+    host = os.getenv("POSTGRES_HOST")
+    port = os.getenv("POSTGRES_PORT")
+    db = os.getenv("POSTGRES_DB")
+
+    if not all([user, password, host, port, db]):
+        raise ValueError("Variables PostgreSQL manquantes dans le fichier .env.")
+
+    password_encoded = quote_plus(password)
+
+    return f"postgresql+psycopg2://{user}:{password_encoded}@{host}:{port}/{db}"
+
+
+@st.cache_data
+def load_orders_from_postgres() -> pd.DataFrame:
+    """
+    Charge orders_enriched depuis PostgreSQL.
+    """
+    engine = create_engine(get_database_url())
+
+    query = "SELECT * FROM orders_enriched"
+
+    orders = pd.read_sql(query, con=engine)
+
+    return normalize_orders(orders)
+
+
+@st.cache_data
+def load_orders_from_csv(gold_batch_dir_str: str) -> pd.DataFrame:
+    """
+    Charge orders_enriched depuis le dernier dossier Gold.
+    """
+    gold_batch_dir = Path(gold_batch_dir_str)
+
+    orders = pd.read_csv(gold_batch_dir / "orders_enriched.csv")
+
+    return normalize_orders(orders)
+
+
+def load_orders() -> tuple[pd.DataFrame, str, str | None, str | None]:
+    """
+    Charge les données du dashboard.
+
+    Priorité :
+    1. PostgreSQL
+    2. CSV Gold en fallback
+    """
+    try:
+        orders = load_orders_from_postgres()
+        return orders, "PostgreSQL", None, None
+
+    except Exception as error:
+        gold_batch_dir = get_latest_gold_batch()
+        orders = load_orders_from_csv(str(gold_batch_dir))
+
+        return orders, "CSV Gold fallback", gold_batch_dir.name, str(error)
 
 @st.cache_resource
 def load_model():
@@ -154,8 +224,7 @@ def build_dimension_analysis(df: pd.DataFrame, analysis_type: str) -> pd.DataFra
     return analysis
 
 
-gold_batch_dir = get_latest_gold_batch()
-orders = load_orders(str(gold_batch_dir))
+orders, data_source_label, gold_batch_name, load_warning = load_orders()
 # model = load_model()
 
 
@@ -164,7 +233,13 @@ orders = load_orders(str(gold_batch_dir))
 # -------------------------------------------------------------------
 
 st.sidebar.title("Filtres globaux")
-st.sidebar.caption(f"Données utilisées : `{gold_batch_dir.name}`")
+st.sidebar.caption(f"Source des données : `{data_source_label}`")
+
+if gold_batch_name is not None:
+    st.sidebar.caption(f"Dossier Gold utilisé : `{gold_batch_name}`")
+
+if load_warning is not None:
+    st.sidebar.warning("PostgreSQL indisponible : fallback CSV Gold.")
 
 min_date = orders["order_purchase_timestamp"].min().date()
 max_date = orders["order_purchase_timestamp"].max().date()
