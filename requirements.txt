@@ -11,3 +11,4 @@ python-dotenv
 ipykernel
 streamlit
 plotly
+joblib

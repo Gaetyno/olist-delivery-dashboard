@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import joblib
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -8,6 +9,7 @@ import streamlit as st
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 GOLD_DIR = PROJECT_ROOT / "data" / "gold"
 
+MODEL_PATH = PROJECT_ROOT / "models" / "random_forest_late_delivery_baseline.joblib"
 
 st.set_page_config(
     page_title="Olist Delivery Performance",
@@ -49,6 +51,19 @@ def load_orders(gold_batch_dir_str: str) -> pd.DataFrame:
             )
 
     return orders
+
+@st.cache_resource
+def load_model():
+    """
+    Charge le modèle ML sauvegardé.
+
+    Le modèle est mis en cache pour éviter de le recharger
+    à chaque interaction utilisateur dans Streamlit.
+    """
+    if not MODEL_PATH.exists():
+        return None
+
+    return joblib.load(MODEL_PATH)
 
 
 def format_percent(value: float) -> str:
@@ -141,6 +156,7 @@ def build_dimension_analysis(df: pd.DataFrame, analysis_type: str) -> pd.DataFra
 
 gold_batch_dir = get_latest_gold_batch()
 orders = load_orders(str(gold_batch_dir))
+# model = load_model()
 
 
 # -------------------------------------------------------------------
@@ -223,12 +239,13 @@ st.markdown(
 )
 
 
-tab_exec, tab_impact, tab_analysis, tab_alerts = st.tabs(
+tab_exec, tab_impact, tab_analysis, tab_alerts, tab_ml = st.tabs(
     [
         "Vue exécutive",
         "Impact satisfaction",
         "Analyse détaillée",
         "Alertes opérationnelles",
+        "Prédiction ML",
     ]
 )
 
@@ -574,5 +591,132 @@ with tab_alerts:
             hide_index=True,
         )
 
+# -------------------------------------------------------------------
+# TAB 5 — ML PREDICTION
+# -------------------------------------------------------------------
+
+with tab_ml:
+    try:
+        model = load_model()
+    except Exception as error:
+        model = None
+        st.error("Le modèle ML n'a pas pu être chargé.")
+        st.code(str(error))
+
+    st.header("Prédiction du risque de retard")
+
+    st.markdown(
+        """
+        Cette section utilise le modèle Random Forest baseline entraîné dans le pipeline.
+        
+        L'objectif est de simuler le risque qu'une commande soit livrée en retard à partir
+        de caractéristiques connues au moment de la commande.
+        """
+    )
+
+    if model is None:
+        st.error(
+            "Modèle ML introuvable. Lance d'abord `python run_pipeline.py` "
+            "pour entraîner et sauvegarder le modèle."
+        )
+    else:
+        st.info(
+            "Ce modèle est une baseline : il permet de démontrer la chaîne ML complète, "
+            "mais il n'est pas encore optimisé pour un usage opérationnel."
+        )
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            customer_state = st.selectbox(
+                "customer_state",
+                sorted(orders["customer_state"].dropna().unique())
+            )
+
+            main_seller_state = st.selectbox(
+                "main_seller_state",
+                sorted(orders["main_seller_state"].dropna().unique())
+            )
+
+            main_product_category = st.selectbox(
+                "main_product_category",
+                sorted(orders["main_product_category"].dropna().unique())
+            )
+
+            payment_type = st.selectbox(
+                "payment_type",
+                sorted(orders["payment_type"].dropna().unique())
+            )
+
+        with col2:
+            item_count = st.number_input("item_count", min_value=1, value=1)
+            product_count = st.number_input("product_count", min_value=1, value=1)
+            seller_count = st.number_input("seller_count", min_value=1, value=1)
+            payment_installments = st.number_input("payment_installments", min_value=0, value=1)
+
+        with col3:
+            total_price = st.number_input("total_price", min_value=0.0, value=100.0)
+            total_freight = st.number_input("total_freight", min_value=0.0, value=20.0)
+            payment_value = st.number_input("payment_value", min_value=0.0, value=120.0)
+            estimated_delivery_days = st.number_input("estimated_delivery_days", min_value=1, value=15)
+
+        col4, col5 = st.columns(2)
+
+        with col4:
+            purchase_month = st.slider("purchase_month", min_value=1, max_value=12, value=6)
+
+        with col5:
+            purchase_dayofweek = st.slider(
+                "purchase_dayofweek",
+                min_value=0,
+                max_value=6,
+                value=2,
+                help="0 = lundi, 6 = dimanche"
+            )
+
+        input_data = pd.DataFrame([{
+            "customer_state": customer_state,
+            "main_seller_state": main_seller_state,
+            "main_product_category": main_product_category,
+            "item_count": item_count,
+            "product_count": product_count,
+            "seller_count": seller_count,
+            "total_price": total_price,
+            "total_freight": total_freight,
+            "payment_value": payment_value,
+            "payment_installments": payment_installments,
+            "payment_type": payment_type,
+            "estimated_delivery_days": estimated_delivery_days,
+            "purchase_month": purchase_month,
+            "purchase_dayofweek": purchase_dayofweek,
+        }])
+
+        if st.button("Prédire le risque de retard"):
+            prediction = model.predict(input_data)[0]
+            probabilities = model.predict_proba(input_data)[0]
+
+            class_labels = list(model.named_steps["classifier"].classes_)
+
+            if True in class_labels:
+                true_index = class_labels.index(True)
+                late_probability = probabilities[true_index]
+            else:
+                late_probability = None
+
+            if prediction:
+                st.error("Résultat : risque de retard détecté")
+            else:
+                st.success("Résultat : pas de retard prédit")
+
+            if late_probability is not None:
+                st.metric(
+                    "Probabilité estimée de retard",
+                    f"{late_probability * 100:.2f}%"
+                )
+
+            st.caption(
+                "Cette prédiction est indicative. Le modèle actuel génère encore beaucoup "
+                "de faux positifs et doit être amélioré avant un usage métier réel."
+            )
 
 st.success("Dashboard interactif chargé avec succès.")
