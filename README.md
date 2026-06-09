@@ -62,3 +62,70 @@ Le projet utilise PostgreSQL via Docker pour stocker les tables Gold générées
 
 ```bash
 docker compose up -d
+
+### Vérifier que PostgreSQL tourne
+
+```bash
+docker ps
+```
+
+Le conteneur attendu est :
+
+```text
+olist_postgres
+```
+
+### Charger les tables Gold dans PostgreSQL
+
+Le chargement est intégré au pipeline complet :
+
+```bash
+python run_pipeline.py
+```
+
+Il est aussi possible de lancer uniquement le chargement PostgreSQL :
+
+```bash
+python src/loading/load_gold_to_postgres.py
+```
+
+Les tables chargées sont :
+
+```text
+orders_enriched
+delivery_kpis_by_state
+delivery_kpis_by_seller
+delivery_kpis_by_category
+ml_dataset
+```
+
+### Source des données du dashboard
+
+Le dashboard Streamlit lit en priorité les données depuis PostgreSQL.
+
+Si PostgreSQL n’est pas disponible, l’application utilise automatiquement les fichiers CSV Gold comme fallback.
+
+Ordre de chargement :
+
+```text
+1. PostgreSQL — table orders_enriched
+2. CSV Gold — data/gold/gold_.../orders_enriched.csv
+```
+
+Pour utiliser PostgreSQL avec Streamlit, lancer d’abord la base :
+
+```bash
+docker compose up -d
+```
+
+Puis s’assurer que les tables Gold ont bien été chargées :
+
+```bash
+python run_pipeline.py
+```
+
+Enfin, lancer le dashboard :
+
+```bash
+python -m streamlit run app/streamlit_app.py
+```
