@@ -51,3 +51,5 @@ Le dashboard utilise automatiquement le dernier dossier Gold disponible dans :
 ```text
 data/gold/
 ```
+
+Le dashboard Streamlit inclut également un onglet de prédiction ML permettant de simuler le risque de retard d'une commande à partir des variables utilisées par le modèle.
