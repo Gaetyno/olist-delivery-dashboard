@@ -2,6 +2,7 @@ from src.ingestion.ingest import run_ingestion
 from src.cleaning.clean import run_cleaning
 from src.transformations.build_gold import run_gold_build
 from src.ml.train_model import main as run_ml_training
+from src.loading.load_gold_to_postgres import load_gold_to_postgres
 
 
 def main() -> None:
@@ -18,7 +19,10 @@ def main() -> None:
     print("\nÉTAPE 3 — CONSTRUCTION GOLD")
     run_gold_build()
 
-    print("\nÉTAPE 4 — ENTRAÎNEMENT ML")
+    print("\nÉTAPE 4 — CHARGEMENT POSTGRESQL")
+    load_gold_to_postgres()
+
+    print("\nÉTAPE 5 — ENTRAÎNEMENT ML")
     run_ml_training()
 
     print("=" * 80)
