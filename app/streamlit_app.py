@@ -103,8 +103,33 @@ def load_orders_from_csv(gold_batch_dir_str: str) -> pd.DataFrame:
 
     return normalize_orders(orders)
 
-
 def load_orders() -> tuple[pd.DataFrame, str, str | None, str | None]:
+    try:
+        orders = load_orders_from_postgres()
+        return orders, "PostgreSQL", None, None
+
+    except Exception as error:
+        deploy_file = PROJECT_ROOT / "data" / "deploy" / "orders_enriched.csv"
+
+        if deploy_file.exists():
+            orders = pd.read_csv(deploy_file)
+            return (
+                normalize_orders(orders),
+                "CSV deploy Hugging Face",
+                "data/deploy/orders_enriched.csv",
+                str(error),
+            )
+
+        gold_batch_dir = get_latest_gold_batch()
+        orders = load_orders_from_csv(str(gold_batch_dir))
+
+        return (
+            orders,
+            "CSV Gold fallback",
+            gold_batch_dir.name,
+            str(error),
+        )
+
     """
     Charge les données du dashboard.
 

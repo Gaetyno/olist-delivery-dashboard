@@ -1,3 +1,14 @@
+---
+title: Olist Delivery Performance Dashboard
+emoji: 📦
+colorFrom: purple
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+
 # Olist Data Project
 
 Projet Data Engineering, Data Analytics et Machine Learning basé sur le dataset Olist Brazilian E-Commerce.
