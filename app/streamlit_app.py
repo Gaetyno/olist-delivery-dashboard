@@ -16,6 +16,7 @@ GOLD_DIR = PROJECT_ROOT / "data" / "gold"
 MODEL_PATH = PROJECT_ROOT / "models" / "random_forest_late_delivery_baseline.joblib"
 
 SATISFACTION_API_URL = "https://mehdiazouaou-olist-satisfaction-api.hf.space/predict"
+SENTIMENT_API_URL = "https://juniordata-olist-sentiment-api.hf.space/predict"
 
 st.set_page_config(
     page_title="Olist Delivery Performance",
@@ -27,6 +28,15 @@ def call_satisfaction_api(payload: dict) -> dict:
     response = requests.post(
         SATISFACTION_API_URL,
         json=payload,
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+def call_sentiment_api(texte: str) -> dict:
+    response = requests.post(
+        SENTIMENT_API_URL,
+        json={"texte": texte},
         timeout=30,
     )
     response.raise_for_status()
@@ -969,5 +979,56 @@ with tab_ml:
                 except requests.exceptions.RequestException as error:
                      st.error("Impossible d’appeler l’API de satisfaction.")
                      st.code(str(error))
+            
+                st.divider()
+
+    st.subheader("Analyse de sentiment des avis clients")
+
+    st.markdown(
+        """
+        Cette section appelle une API externe déployée sur Hugging Face.
+        Elle analyse un avis client en portugais et estime si le sentiment exprimé
+        est positif ou négatif.
+        """
+    )
+
+    review_text = st.text_area(
+        "Avis client en portugais",
+        value="Não recebi o produto, péssimo atendimento.",
+        height=120,
+        key="sentiment_review_text",
+    )
+
+    if st.button(
+        "Analyser le sentiment",
+        type="primary",
+        key="predict_sentiment_api",
+    ):
+        try:
+            result = call_sentiment_api(review_text)
+
+            st.success("Réponse reçue depuis l’API de sentiment.")
+
+            label = result.get("label")
+            proba_mecontent = result.get("proba_mecontent")
+
+            if label is not None:
+                if str(label).lower() in ["mécontent", "mecontent", "negatif", "négatif", "negative"]:
+                    st.error(f"❌ Sentiment prédit : **{label}**")
+                else:
+                    st.success(f"✅ Sentiment prédit : **{label}**")
+
+            if proba_mecontent is not None:
+                st.metric(
+                    "Probabilité de mécontentement",
+                    f"{float(proba_mecontent) * 100:.2f}%",
+                )
+
+            with st.expander("Voir la réponse complète de l’API"):
+                st.json(result)
+
+        except requests.exceptions.RequestException as error:
+            st.error("Impossible d’appeler l’API de sentiment.")
+            st.code(str(error))
             
 st.success("Dashboard interactif chargé avec succès.")
