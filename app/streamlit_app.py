@@ -953,34 +953,34 @@ with tab_ml:
         type="primary",
         key="predict_satisfaction_api",
     ):
-                try:
-                    result = call_satisfaction_api(satisfaction_payload)
+        try:
+            result = call_satisfaction_api(satisfaction_payload)
 
-                    prediction_label = result.get("prediction_label")
-                    probability = result.get("satisfaction_probability")
+            prediction_label = result.get("prediction_label")
+            probability = result.get("satisfaction_probability")
 
-                    st.success("Réponse reçue depuis l’API de satisfaction.")
+            st.success("Réponse reçue depuis l’API de satisfaction.")
 
-                    if prediction_label is not None:
-                       if str(prediction_label).lower() == "satisfait":
-                          st.success(f"✅ Prédiction : **{prediction_label}**")
-                       else:
-                          st.error(f"❌ Prédiction : **{prediction_label}**")
+            if prediction_label is not None:
+                if str(prediction_label).lower() == "satisfait":
+                    st.success(f"✅ Prédiction : **{prediction_label}**")
+                else:
+                    st.error(f"❌ Prédiction : **{prediction_label}**")
 
-                    if probability is not None:
-                        st.metric(
-                           "Probabilité de satisfaction",
-                         f"{float(probability) * 100:.2f}%",
-                        )
+            if probability is not None:
+                st.metric(
+                    "Probabilité de satisfaction",
+                    f"{float(probability) * 100:.2f}%",
+                )
 
-                    with st.expander("Voir la réponse complète de l’API"):
-                         st.json(result)
+            with st.expander("Voir la réponse complète de l’API"):
+                    st.json(result)
 
-                except requests.exceptions.RequestException as error:
-                     st.error("Impossible d’appeler l’API de satisfaction.")
-                     st.code(str(error))
-            
-                st.divider()
+        except requests.exceptions.RequestException as error:
+                st.error("Impossible d’appeler l’API de satisfaction.")
+                st.code(str(error))
+    
+        st.divider()
 
     st.subheader("Analyse de sentiment des avis clients")
 
@@ -1030,5 +1030,5 @@ with tab_ml:
         except requests.exceptions.RequestException as error:
             st.error("Impossible d’appeler l’API de sentiment.")
             st.code(str(error))
-            
+
 st.success("Dashboard interactif chargé avec succès.")
