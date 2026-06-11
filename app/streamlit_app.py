@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import requests
 import joblib
 import pandas as pd
 import plotly.express as px
@@ -14,12 +15,22 @@ GOLD_DIR = PROJECT_ROOT / "data" / "gold"
 
 MODEL_PATH = PROJECT_ROOT / "models" / "random_forest_late_delivery_baseline.joblib"
 
+SATISFACTION_API_URL = "https://mehdiazouaou-olist-satisfaction-api.hf.space/predict"
+
 st.set_page_config(
     page_title="Olist Delivery Performance",
     page_icon="📦",
     layout="wide",
 )
 
+def call_satisfaction_api(payload: dict) -> dict:
+    response = requests.post(
+        SATISFACTION_API_URL,
+        json=payload,
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
 
 def get_latest_gold_batch() -> Path:
     gold_batches = [
@@ -819,4 +830,144 @@ with tab_ml:
                 "de faux positifs et doit être amélioré avant un usage métier réel."
             )
 
+    st.divider()
+
+    st.subheader("Prédiction de satisfaction client")
+
+    st.markdown(
+        """
+        Cette section appelle une API externe déployée sur Hugging Face.
+        Elle estime la probabilité qu’un client soit satisfait à partir des caractéristiques
+        principales d’une commande.
+        """
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        delivery_time_days = st.number_input(
+            "Délai réel de livraison (jours)",
+            min_value=0,
+            value=10,
+            step=1,
+            key="satisfaction_delivery_time_days",
+        )
+
+        estimated_delivery_time_days = st.number_input(
+            "Délai estimé de livraison (jours)",
+            min_value=0,
+            value=12,
+            step=1,
+            key="satisfaction_estimated_delivery_time_days",
+        )
+
+        delivery_delay_days = st.number_input(
+            "Retard de livraison (jours)",
+            min_value=0,
+            value=0,
+            step=1,
+            key="satisfaction_delivery_delay_days",
+        )
+
+        is_late = st.selectbox(
+            "Commande en retard ?",
+            options=[0, 1],
+            format_func=lambda x: "Non" if x == 0 else "Oui",
+            key="satisfaction_is_late",
+        )
+
+        nb_items = st.number_input(
+            "Nombre d’articles",
+            min_value=1,
+            value=1,
+            step=1,
+            key="satisfaction_nb_items",
+        )
+
+    with col2:
+        total_price = st.number_input(
+            "Prix total de la commande",
+            min_value=0.0,
+            value=120.5,
+            step=1.0,
+            key="satisfaction_total_price",
+        )
+
+        total_freight = st.number_input(
+            "Frais de livraison",
+            min_value=0.0,
+            value=15.9,
+            step=1.0,
+            key="satisfaction_total_freight",
+        )
+
+        product_weight_g = st.number_input(
+            "Poids du produit (grammes)",
+            min_value=0.0,
+            value=800.0,
+            step=100.0,
+            key="satisfaction_product_weight_g",
+        )
+
+        customer_state = st.selectbox(
+            "État du client",
+            options=[
+                "SP", "RJ", "MG", "RS", "PR", "SC", "BA", "DF", "GO", "ES",
+                "PE", "CE", "PA", "MT", "MA", "MS", "PB", "PI", "RN", "AL",
+                "SE", "TO", "RO", "AM", "AC", "AP", "RR",
+            ],
+            key="satisfaction_customer_state",
+        )
+
+        payment_type = st.selectbox(
+            "Type de paiement",
+            options=["credit_card", "boleto", "voucher", "debit_card", "unknown"],
+            key="satisfaction_payment_type",
+        )
+
+    satisfaction_payload = {
+        "delivery_time_days": delivery_time_days,
+        "estimated_delivery_time_days": estimated_delivery_time_days,
+        "delivery_delay_days": delivery_delay_days,
+        "is_late": is_late,
+        "nb_items": nb_items,
+        "total_price": total_price,
+        "total_freight": total_freight,
+        "product_weight_g": product_weight_g,
+        "customer_state": customer_state,
+        "payment_type": payment_type,
+    }
+
+    if st.button(
+        "Prédire la satisfaction client",
+        type="primary",
+        key="predict_satisfaction_api",
+    ):
+                try:
+                    result = call_satisfaction_api(satisfaction_payload)
+
+                    prediction_label = result.get("prediction_label")
+                    probability = result.get("satisfaction_probability")
+
+                    st.success("Réponse reçue depuis l’API de satisfaction.")
+
+                    if prediction_label is not None:
+                       if str(prediction_label).lower() == "satisfait":
+                          st.success(f"✅ Prédiction : **{prediction_label}**")
+                       else:
+                          st.error(f"❌ Prédiction : **{prediction_label}**")
+
+                    if probability is not None:
+                        st.metric(
+                           "Probabilité de satisfaction",
+                         f"{float(probability) * 100:.2f}%",
+                        )
+
+                    with st.expander("Voir la réponse complète de l’API"):
+                         st.json(result)
+
+                except requests.exceptions.RequestException as error:
+                     st.error("Impossible d’appeler l’API de satisfaction.")
+                     st.code(str(error))
+            
 st.success("Dashboard interactif chargé avec succès.")
